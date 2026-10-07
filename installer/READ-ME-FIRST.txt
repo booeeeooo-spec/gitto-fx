@@ -1,0 +1,27 @@
+GITTO FX - JG Productions
+=========================
+
+Twenty plugins:
+  Gitto FX EQ, Compressor, Limiter, Reverb, Delay, Chorus,
+  Multiband, Smooth, Opto Comp, FET Comp, Bus Comp, De-Esser, Channel Strip,
+  Saturator, Distortion, Tape, Plate, Space, Tune, Shaper.
+Formats: VST3 and Audio Unit. macOS 10.13 or later, Apple silicon and Intel.
+
+INSTALL
+1. Double-click "Install Gitto FX.command".
+   The first time, macOS will say it cannot verify the file. That is expected:
+   these builds are not notarized with Apple yet.
+     - macOS 14 and earlier: right-click the file, choose Open, then Open again.
+     - macOS 15 and later: open System Settings > Privacy & Security, scroll
+       down, click "Open Anyway" next to the file's name, then run it again.
+2. Open FL Studio > Options > Manage plugins > Find installed plugins.
+3. The plugins appear under Effects as "Gitto FX ...".
+
+INSTALL BY HAND (if you prefer)
+  Copy the contents of the VST3 folder to   ~/Library/Audio/Plug-Ins/VST3
+  Copy the contents of the AU folder to     ~/Library/Audio/Plug-Ins/Components
+  Then run this once in Terminal:
+    xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Gitto\ FX*.vst3 ~/Library/Audio/Plug-Ins/Components/Gitto\ FX*.component
+
+REMOVE
+  Delete the "Gitto FX ..." items from the two folders above.
