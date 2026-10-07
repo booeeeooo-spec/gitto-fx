@@ -1,0 +1,56 @@
+name: Build Gitto FX
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  macos:
+    name: macOS (VST3 + AU, Apple silicon + Intel)
+    runs-on: macos-15
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: DSP tests
+        continue-on-error: true
+        run: |
+          c++ -std=c++17 -O2 tests/dsp_tests.cpp -o t1 && ./t1 | tail -1
+          c++ -std=c++17 -O2 tests/dsp_tests2.cpp -o t2 && ./t2 | tail -1
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" 2>&1 | tee build.log
+          cmake --build build --config Release --parallel 4 -- -k 2>&1 | tee -a build.log
+      - name: Package
+        run: |
+          set -e
+          mkdir -p "dist/Gitto FX/VST3" "dist/Gitto FX/AU"
+          find build -type d -name "Gitto FX*.vst3" -path "*VST3*" -prune -exec cp -R {} "dist/Gitto FX/VST3/" \;
+          find build -type d -name "Gitto FX*.component" -prune -exec cp -R {} "dist/Gitto FX/AU/" \;
+          test "$(ls "dist/Gitto FX/VST3" | wc -l)" -eq 20
+          test "$(ls "dist/Gitto FX/AU" | wc -l)" -eq 20
+          for p in "dist/Gitto FX/VST3/"*.vst3 "dist/Gitto FX/AU/"*.component; do codesign --force --deep --sign - "$p"; done
+          cp "installer/Install Gitto FX.command" installer/READ-ME-FIRST.txt "dist/Gitto FX/"
+          chmod +x "dist/Gitto FX/Install Gitto FX.command"
+          cd dist && ditto -c -k --keepParent "Gitto FX" GittoFX-macOS.zip
+      - name: Validate Audio Units
+        continue-on-error: true
+        run: |
+          touch auval.txt
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "dist/Gitto FX/AU/"*.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          for c in Gfeq Gfcm Gflm Gfrv Gfdl Gfch Gfmb Gfsm Gfop Gffe Gfsp Gfbu Gftp Gfpl Gftu Gfsa Gfde Gfdi Gfsh Gfcs; do
+            auval -v aufx $c Jgpr > "auval-$c.txt" 2>&1 && echo "$c PASS" || echo "$c FAIL"
+          done | tee auval.txt
+      - name: Publish the plugins
+        run: gh release create "build-${GITHUB_RUN_NUMBER}" dist/GittoFX-macOS.zip auval.txt --target "$GITHUB_SHA" --title "Gitto FX build ${GITHUB_RUN_NUMBER}" --notes "macOS VST3 and Audio Unit plugins. Unzip and follow READ-ME-FIRST.txt."
+      - name: Publish the log if the build failed
+        if: failure()
+        run: |
+          grep -n -B2 -A12 -E "error:|Error [0-9]|\*\*\* " build.log | head -c 900000 > errors.txt || true
+          gzip -k build.log || true
+          gh release create "failed-${GITHUB_RUN_NUMBER}" errors.txt build.log.gz --prerelease --target "$GITHUB_SHA" --title "Failed build ${GITHUB_RUN_NUMBER}" --notes "Build log for a failed build."
